@@ -1,17 +1,32 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 )
 
-// TIP To run your code, right-click the code and select <b>Run</b>. Alternatively, click
-// the <icon src="AllIcons.Actions.Execute"/> icon in the gutter and select the <b>Run</b> menu item from here.
-func respondToRequest(res http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(res, "Hello World!")
+func newProxy(targetHost string) (*httputil.ReverseProxy, error) {
+	forwardUrl, err := url.Parse(targetHost)
+	if err != nil {
+		return nil, err
+	}
+	return httputil.NewSingleHostReverseProxy(forwardUrl), nil
+}
+
+func ProxyRequestHandler(proxy *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) {
+	return func(res http.ResponseWriter, req *http.Request) {
+		proxy.ServeHTTP(res, req)
+	}
 }
 func main() {
-	err := http.ListenAndServe(":8080", http.HandlerFunc(respondToRequest))
+	proxy, err := newProxy("http://localhost:8090")
+	if err != nil {
+		panic(err)
+	}
+
+	http.HandleFunc("/", ProxyRequestHandler(proxy))
+	err = http.ListenAndServe(":8080", nil)
 	if err != nil {
 		panic(err)
 	}
